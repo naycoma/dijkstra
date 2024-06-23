@@ -1,27 +1,13 @@
-# Dijkstra's algorithm in Golang
+package main
 
-Type-safe Dijkstra's algorithm implemented in Go.
+import (
+	"fmt"
+	"strconv"
+	"strings"
 
-## Features
+	"github.com/naycoma/dijkstra"
+)
 
-- Flexible implementation using generics
-- Customizable cost comparison functions to support multiple types
-- Clean API for easy integration
-
-## Installation
-
-If you are using Go modules, you can install the package with the following
-command:
-
-```bash
-go get github.com/naycoma/dijkstra
-```
-
-## Usage
-
-### Example Usage
-
-```go
 type Cost uint
 
 type Node struct {
@@ -82,15 +68,3 @@ func Text2Graph(text string) map[Node]Cost {
 	}
 	return graph
 }
-```
-
-> (0, 0) (1, 0) (1, 1) (1, 2) (1, 3) (0, 3) (0, 4) (0, 5) (1, 5) (1, 6) (2, 6) (3, 6) (3, 7) (4, 7) (5, 7) (5, 6) (5, 5)
-
-
-### Options
-
-You can customize the behavior of the algorithm using the `Options` struct.
-
-## License
-
-This project is licensed under the [MIT license](LICENSE).
