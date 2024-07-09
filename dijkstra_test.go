@@ -16,28 +16,28 @@ import (
 
 type Cost uint
 
-type Node struct {
+type Key struct {
 	X int
 	Y int
 }
 
-func (p Node) String() string {
+func (p Key) String() string {
 	return fmt.Sprintf("(%d, %d)", p.Y, p.X)
 }
 
-func FlatGraph(cols, rows uint, cost Cost) map[Node]Cost {
-	costs := make(map[Node]Cost)
+func FlatGraph(cols, rows uint, cost Cost) map[Key]Cost {
+	costs := make(map[Key]Cost)
 	for col := range lo.Range(int(cols)) {
 		for row := range lo.Range(int(rows)) {
-			pos := Node{X: row, Y: col}
+			pos := Key{X: row, Y: col}
 			costs[pos] = cost
 		}
 	}
 	return costs
 }
 
-func RandomWallGraph(cols, rows uint) map[Node]Cost {
-	costs := make(map[Node]Cost)
+func RandomWallGraph(cols, rows uint) map[Key]Cost {
+	costs := make(map[Key]Cost)
 	for pos, cost := range FlatGraph(cols, rows, 1) {
 		if rand.Intn(7) == 0 {
 			continue
@@ -47,17 +47,17 @@ func RandomWallGraph(cols, rows uint) map[Node]Cost {
 	return costs
 }
 
-func MockOptions(graph map[Node]Cost) dijkstra.Options[Node, Cost] {
-	return dijkstra.Options[Node, Cost]{
-		Accumulator: func(agg Cost, from, to Node) (next Cost, ok bool) {
+func MockOptions(graph map[Key]Cost) dijkstra.Options[Key, Cost] {
+	return dijkstra.Options[Key, Cost]{
+		Accumulator: func(agg Cost, from, to Key) (next Cost, ok bool) {
 			cost, ok := graph[to]
 			return agg + cost, ok
 		},
 		Less: func(i, j Cost) bool {
 			return i < j
 		},
-		Edges: func(p Node) (edges []Node) {
-			for _, to := range []Node{
+		Edges: func(p Key) (edges []Key) {
+			for _, to := range []Key{
 				{X: p.X, Y: p.Y + 1},
 				{X: p.X, Y: p.Y - 1},
 				{X: p.X + 1, Y: p.Y},
@@ -84,9 +84,9 @@ func TestReachable(t *testing.T) {
 	1  1  1  1  1  ■  1  1  1  1
 	`)
 	options := MockOptions(graph)
-	costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
+	costs := options.Dijkstra(Key{X: 0, Y: 0}, Cost(0))
 	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
-	path := lo.Must(options.PathResolve(costs, Node{X: 5, Y: 5}))
+	path := lo.Must(options.ShortestPath(costs, Key{X: 5, Y: 5}))
 	t.Log(path)
 }
 
@@ -102,8 +102,8 @@ func TestReachablePathFinder(t *testing.T) {
 	1  1  1  1  1  ■  1  1  1  1
 	`)
 	options := MockOptions(graph)
-	finder := options.CreatePathFinder(Node{X: 0, Y: 0}, Cost(0))
-	path := lo.Must(finder(Node{X: 5, Y: 5}))
+	finder := options.CreatePathFinder(Key{X: 0, Y: 0}, Cost(0))
+	path := lo.Must(finder(Key{X: 5, Y: 5}))
 	t.Log(path)
 }
 
@@ -120,10 +120,10 @@ func TestUnreachable(t *testing.T) {
 	1  1  1  ■  1  1  1  1  1  1
 	`)
 	options := MockOptions(graph)
-	costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
+	costs := options.Dijkstra(Key{X: 0, Y: 0}, Cost(0))
 	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
-	_, err := options.PathResolve(costs, Node{X: 5, Y: 5})
-	var notReachableErr *dijkstra.NotReachableError[Node, Cost]
+	_, err := options.ShortestPath(costs, Key{X: 5, Y: 5})
+	var notReachableErr *dijkstra.NotReachableError[Key, Cost]
 	a.ErrorAs(err, &notReachableErr)
 }
 
@@ -131,8 +131,8 @@ func TestOverGraphEdges(t *testing.T) {
 	a := assert.New(t)
 	graph := FlatGraph(10, 8, 1)
 	options := MockOptions(graph)
-	options.Edges = func(p Node) []Node {
-		return []Node{
+	options.Edges = func(p Key) []Key {
+		return []Key{
 			{X: p.X, Y: p.Y + 1},
 			{X: p.X, Y: p.Y - 1},
 			{X: p.X + 1, Y: p.Y},
@@ -142,9 +142,9 @@ func TestOverGraphEdges(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	go func() {
 		defer cancel()
-		costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
+		costs := options.Dijkstra(Key{X: 0, Y: 0}, Cost(0))
 		t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
-		path := lo.Must(options.PathResolve(costs, Node{X: 5, Y: 5}))
+		path := lo.Must(options.ShortestPath(costs, Key{X: 5, Y: 5}))
 		t.Log(path)
 	}()
 	<-ctx.Done()
@@ -153,15 +153,15 @@ func TestOverGraphEdges(t *testing.T) {
 	}
 }
 
-func Costs2Graph(costs map[Node]dijkstra.NodeCost[Node, Cost]) map[Node]Cost {
-	graph := make(map[Node]Cost)
+func Costs2Graph(costs map[Key]dijkstra.Node[Key, Cost]) map[Key]Cost {
+	graph := make(map[Key]Cost)
 	for node, cost := range costs {
 		graph[node] = cost.Cost
 	}
 	return graph
 }
 
-func Graph2Text(graph map[Node]Cost) string {
+func Graph2Text(graph map[Key]Cost) string {
 	var builder strings.Builder
 	maxRow := 0
 	maxCol := 0
@@ -177,7 +177,7 @@ func Graph2Text(graph map[Node]Cost) string {
 	// Generate the graph text representation
 	for row := 0; row <= maxRow; row++ {
 		for col := 0; col <= maxCol; col++ {
-			cost, exists := graph[Node{X: row, Y: col}]
+			cost, exists := graph[Key{X: row, Y: col}]
 			if exists {
 				builder.WriteString(fmt.Sprintf("%2d ", cost))
 			} else {
@@ -189,12 +189,12 @@ func Graph2Text(graph map[Node]Cost) string {
 	return builder.String()
 }
 
-func Text2Graph(text string) map[Node]Cost {
-	graph := make(map[Node]Cost)
+func Text2Graph(text string) map[Key]Cost {
+	graph := make(map[Key]Cost)
 	for row, line := range strings.Split(strings.TrimSpace(text), "\n") {
 		for col, cell := range strings.Fields(line) {
 			if cost, err := strconv.Atoi(cell); err == nil {
-				graph[Node{X: row, Y: col}] = Cost(cost)
+				graph[Key{X: row, Y: col}] = Cost(cost)
 			}
 		}
 	}
