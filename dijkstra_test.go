@@ -90,6 +90,23 @@ func TestReachable(t *testing.T) {
 	t.Log(path)
 }
 
+func TestReachablePathFinder(t *testing.T) {
+	graph := Text2Graph(`
+	1  ■  1  1  1  1  1  1  ■  1 
+	1  1  1  1  1  1  1  1  ■  1 
+	1  1  1  1  1  1  1  1  1  1 
+	■  1  1  1  1  1  1  1  1  1 
+	■  1  1  1  ■  ■  ■  1  1  1 
+	1  ■  1  1  ■  1  1  1  1  ■ 
+	1  1  1  1  ■  1  ■  1  1  1 
+	1  1  1  1  1  ■  1  1  1  1
+	`)
+	options := MockOptions(graph)
+	finder := options.CreatePathFinder(Node{X: 0, Y: 0}, Cost(0))
+	path := lo.Must(finder(Node{X: 5, Y: 5}))
+	t.Log(path)
+}
+
 func TestUnreachable(t *testing.T) {
 	a := assert.New(t)
 	graph := Text2Graph(`
