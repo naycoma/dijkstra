@@ -5,13 +5,14 @@ import (
 	"fmt"
 )
 
-type nodeAndCost[K comparable, R any] struct {
+type NodeCost[K comparable, R any] struct {
 	Key  K
 	Cost R
+	Prev *K
 }
 
 type heapNodes[K comparable, R any] struct {
-	nodes []*nodeAndCost[K, R]
+	nodes []*NodeCost[K, R]
 	less  func(i, j R) bool
 }
 
@@ -28,7 +29,7 @@ func (pq *heapNodes[K, R]) Swap(i, j int) {
 }
 
 func (pq *heapNodes[K, R]) Push(x any) {
-	pq.nodes = append(pq.nodes, x.(*nodeAndCost[K, R]))
+	pq.nodes = append(pq.nodes, x.(*NodeCost[K, R]))
 }
 
 func (pq *heapNodes[K, R]) Pop() any {
@@ -41,12 +42,12 @@ var _ heap.Interface = (*heapNodes[int, int])(nil)
 
 // priorityNodes is a priority queue for nodes and their costs.
 type priorityNodes[K comparable, R any] struct {
-	h *heapNodes[K, R]
+	*heapNodes[K, R]
 }
 
 func newPriorityNodes[K comparable, R any](less func(i, j R) bool) *priorityNodes[K, R] {
 	h := &heapNodes[K, R]{
-		nodes: []*nodeAndCost[K, R]{},
+		nodes: []*NodeCost[K, R]{},
 		less:  less,
 	}
 	heap.Init(h)
@@ -54,17 +55,17 @@ func newPriorityNodes[K comparable, R any](less func(i, j R) bool) *priorityNode
 }
 
 // Extracts the minimum cost node from the priority queue
-func (pq *priorityNodes[K, R]) Pop() (node K, cost R) {
-	nc := heap.Pop(pq.h).(*nodeAndCost[K, R])
-	return nc.Key, nc.Cost
+func (pq *priorityNodes[K, R]) Pop() (current K, prev *K, cost R) {
+	nc := heap.Pop(pq.heapNodes).(*NodeCost[K, R])
+	return nc.Key, nc.Prev, nc.Cost
 }
 
-func (pq *priorityNodes[K, R]) Push(node K, cost R) {
-	heap.Push(pq.h, &nodeAndCost[K, R]{Key: node, Cost: cost})
+func (pq *priorityNodes[K, R]) Push(current K, prev *K, cost R) {
+	heap.Push(pq.heapNodes, &NodeCost[K, R]{Key: current, Prev: prev, Cost: cost})
 }
 
 func (pq *priorityNodes[K, R]) Empty() bool {
-	return pq.h.Len() == 0
+	return pq.heapNodes.Len() == 0
 }
 
 // Dijkstra runs Dijkstra's algorithm with the given options.
@@ -79,20 +80,20 @@ func Dijkstra[K comparable, R any](
 	initial R,
 	less func(i R, j R) bool,
 	edges func(from K) (dest []K),
-) (costs map[K]R) {
+) (costs map[K]NodeCost[K, R]) {
 	open := newPriorityNodes[K](less)
-	costs = make(map[K]R)
+	costs = make(map[K]NodeCost[K, R])
 
-	open.Push(start, initial)
+	open.Push(start, nil, initial)
 	for !open.Empty() {
-		current, cost := open.Pop()
+		current, prev, cost := open.Pop()
 		if _, ok := costs[current]; ok {
 			continue
 		}
-		costs[current] = cost
+		costs[current] = NodeCost[K, R]{Key: current, Cost: cost, Prev: prev}
 		for _, dest := range edges(current) {
 			if destCost, ok := accumulator(cost, current, dest); ok {
-				open.Push(dest, destCost)
+				open.Push(dest, &current, destCost)
 			}
 		}
 	}
@@ -112,7 +113,7 @@ type Options[K comparable, R any] struct {
 }
 
 // Dijkstra runs Dijkstra's algorithm with the given options.
-func (c Options[K, R]) Dijkstra(start K, initial R) (costs map[K]R) {
+func (c Options[K, R]) Dijkstra(start K, initial R) (costs map[K]NodeCost[K, R]) {
 	if c.Edges == nil {
 		var k K
 		if _, ok := any(k).(interface{ Adjacent() []K }); ok {
@@ -131,23 +132,22 @@ func (c Options[K, R]) Dijkstra(start K, initial R) (costs map[K]R) {
 }
 
 // PathResolve resolves the path from the start node to the goal node.
-func (c Options[K, R]) PathResolve(costs map[K]R, goal K) ([]K, error) {
+func (c Options[K, R]) PathResolve(costs map[K]NodeCost[K, R], goal K) ([]K, error) {
 	if _, ok := costs[goal]; !ok {
 		return nil, newNotReachableError(costs, c.Less, goal)
 	}
 	path := []K{goal}
-	current := goal
 	for {
-		shortest, ok := minCostNode(c.Edges(current), costs, c.Less)
+		current := path[0]
+		node, ok := costs[current]
 		if !ok {
 			return nil, newNotReachableError(costs, c.Less, goal)
 		}
-		// If the cost is not decreasing, it means we have reached the start node.
-		if !c.Less(costs[shortest], costs[current]) {
+		if node.Prev == nil {
 			return path, nil
 		}
-		path = append([]K{shortest}, path...)
-		current = shortest
+		prev := *node.Prev
+		path = append([]K{prev}, path...)
 	}
 }
 
@@ -167,7 +167,7 @@ var _ error = &NotReachableError[int, int]{}
 
 // NotReachableError indicates that the specified goal cannot be reached from the start node.
 type NotReachableError[K comparable, R any] struct {
-	Costs           map[K]R
+	Costs           map[K]NodeCost[K, R]
 	Start           K
 	Goal            K
 	StartingUnknown bool
@@ -180,7 +180,7 @@ func (e *NotReachableError[K, R]) Error() string {
 	return fmt.Sprintf("the specified goal is not reachable from the start node: %v -> %v", e.Start, e.Goal)
 }
 
-func newNotReachableError[K comparable, R any](costs map[K]R, less func(i R, j R) bool, goal K) error {
+func newNotReachableError[K comparable, R any](costs map[K]NodeCost[K, R], less func(i R, j R) bool, goal K) error {
 	start, ok := minCostNode(getKeys(costs), costs, less)
 	return &NotReachableError[K, R]{Costs: costs, Start: start, Goal: goal, StartingUnknown: !ok}
 }
@@ -195,12 +195,12 @@ func getKeys[K comparable, V any](collection map[K]V) []K {
 	return keys
 }
 
-func minCostNode[K comparable, R any](nodes []K, costs map[K]R, less func(i R, j R) bool) (min K, ok bool) {
+func minCostNode[K comparable, R any](nodes []K, costs map[K]NodeCost[K, R], less func(i R, j R) bool) (min K, ok bool) {
 	return filterMinBy(nodes, func(node K, _ int) bool {
 		_, ok := costs[node]
 		return ok
 	}, func(i K, j K) bool {
-		return less(costs[i], costs[j])
+		return less(costs[i].Cost, costs[j].Cost)
 	})
 }
 

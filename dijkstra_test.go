@@ -85,7 +85,7 @@ func TestReachable(t *testing.T) {
 	`)
 	options := MockOptions(graph)
 	costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
-	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(costs))
+	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
 	path := lo.Must(options.PathResolve(costs, Node{X: 5, Y: 5}))
 	t.Log(path)
 }
@@ -121,7 +121,7 @@ func TestUnreachable(t *testing.T) {
 	`)
 	options := MockOptions(graph)
 	costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
-	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(costs))
+	t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
 	_, err := options.PathResolve(costs, Node{X: 5, Y: 5})
 	var notReachableErr *dijkstra.NotReachableError[Node, Cost]
 	a.ErrorAs(err, &notReachableErr)
@@ -143,7 +143,7 @@ func TestOverGraphEdges(t *testing.T) {
 	go func() {
 		defer cancel()
 		costs := options.Dijkstra(Node{X: 0, Y: 0}, Cost(0))
-		t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(costs))
+		t.Log("\n" + Graph2Text(graph) + "\n" + Graph2Text(Costs2Graph(costs)))
 		path := lo.Must(options.PathResolve(costs, Node{X: 5, Y: 5}))
 		t.Log(path)
 	}()
@@ -151,6 +151,14 @@ func TestOverGraphEdges(t *testing.T) {
 	if ctx.Err() == context.DeadlineExceeded {
 		a.Fail("Dijkstra took too long")
 	}
+}
+
+func Costs2Graph(costs map[Node]dijkstra.NodeCost[Node, Cost]) map[Node]Cost {
+	graph := make(map[Node]Cost)
+	for node, cost := range costs {
+		graph[node] = cost.Cost
+	}
+	return graph
 }
 
 func Graph2Text(graph map[Node]Cost) string {
