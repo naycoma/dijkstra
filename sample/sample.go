@@ -26,20 +26,25 @@ func main() {
 	■  1  1  1  ■  1  ■  1 
 	`)
 	options := dijkstra.Options[Node, Cost]{
-		Accumulator: func(agg Cost, key Node) (Cost, bool) {
-			cost, ok := graph[key]
+		Accumulator: func(agg Cost, from, to Node) (Cost, bool) {
+			cost, ok := graph[to]
 			return agg + cost, ok
 		},
 		Less: func(i, j Cost) bool {
 			return i < j
 		},
-		Edges: func(p Node) []Node {
-			return []Node{
+		Edges: func(p Node) (edges []Node) {
+			for _, to := range []Node{
 				{Y: p.Y, X: p.X + 1},
 				{Y: p.Y, X: p.X - 1},
 				{Y: p.Y + 1, X: p.X},
 				{Y: p.Y - 1, X: p.X},
+			} {
+				if _, ok := graph[to]; ok {
+					edges = append(edges, to)
+				}
 			}
+			return edges
 		},
 	}
 

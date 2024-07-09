@@ -40,8 +40,8 @@ func main() {
 	■  1  1  1  ■  1  ■  1 
 	`)
 	options := dijkstra.Options[Node, Cost]{
-		Accumulator: func(agg Cost, key Node) (Cost, bool) {
-			cost, ok := graph[key]
+		Accumulator: func(agg Cost, from, to Node) (Cost, bool) {
+			cost, ok := graph[to]
 			return agg + cost, ok
 		},
 		Less: func(i, j Cost) bool {

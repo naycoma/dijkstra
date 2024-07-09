@@ -75,17 +75,15 @@ func (pq *priorityNodes[K, R]) Empty() bool {
 // returns : The costs to reach each node from the start node.
 func Dijkstra[K comparable, R any](
 	start K,
-	accumulator func(agg R, key K) (next R, ok bool),
+	accumulator func(agg R, from, to K) (next R, ok bool),
 	initial R,
 	less func(i R, j R) bool,
-	edges func(K) []K,
+	edges func(from K) (dest []K),
 ) (costs map[K]R) {
 	open := newPriorityNodes[K](less)
 	costs = make(map[K]R)
 
-	if startCost, ok := accumulator(initial, start); ok {
-		open.Push(start, startCost)
-	}
+	open.Push(start, initial)
 	for !open.Empty() {
 		current, cost := open.Pop()
 		if _, ok := costs[current]; ok {
@@ -93,7 +91,7 @@ func Dijkstra[K comparable, R any](
 		}
 		costs[current] = cost
 		for _, dest := range edges(current) {
-			if destCost, ok := accumulator(cost, dest); ok {
+			if destCost, ok := accumulator(cost, current, dest); ok {
 				open.Push(dest, destCost)
 			}
 		}
@@ -106,11 +104,11 @@ func Dijkstra[K comparable, R any](
 // and a function to retrieve adjacent nodes (edges).
 type Options[K comparable, R any] struct {
 	// Function to accumulate costs from one node to another.
-	Accumulator func(agg R, key K) (next R, ok bool)
+	Accumulator func(agg R, from, to K) (next R, ok bool)
 	// Comparison function to determine the order of costs.
 	Less func(i R, j R) bool
 	// Function to retrieve adjacent nodes.
-	Edges func(K) []K
+	Edges func(from K) (dest []K)
 }
 
 // Dijkstra runs Dijkstra's algorithm with the given options.

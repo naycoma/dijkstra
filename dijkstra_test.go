@@ -49,26 +49,25 @@ func RandomWallGraph(cols, rows uint) map[Node]Cost {
 
 func MockOptions(graph map[Node]Cost) dijkstra.Options[Node, Cost] {
 	return dijkstra.Options[Node, Cost]{
-		Accumulator: func(agg Cost, key Node) (next Cost, ok bool) {
-			cost, ok := graph[key]
+		Accumulator: func(agg Cost, from, to Node) (next Cost, ok bool) {
+			cost, ok := graph[to]
 			return agg + cost, ok
 		},
 		Less: func(i, j Cost) bool {
 			return i < j
 		},
-		Edges: func(p Node) []Node {
-			posList := []Node{}
-			for _, dest := range []Node{
+		Edges: func(p Node) (edges []Node) {
+			for _, to := range []Node{
 				{X: p.X, Y: p.Y + 1},
 				{X: p.X, Y: p.Y - 1},
 				{X: p.X + 1, Y: p.Y},
 				{X: p.X - 1, Y: p.Y},
 			} {
-				if _, ok := graph[dest]; ok {
-					posList = append(posList, dest)
+				if _, ok := graph[to]; ok {
+					edges = append(edges, to)
 				}
 			}
-			return posList
+			return edges
 		},
 	}
 }
